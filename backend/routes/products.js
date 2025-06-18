@@ -107,11 +107,11 @@ router.get('/:id', authenticateToken, (req, res) => {
 });
 
 // Create new product (protected route)
-router.post('/', authenticateToken, upload.single('image'), (req, res) => {
+router.post('/', authenticateToken, (req, res) => {
   try {
-    const { title, description, category } = req.body;
+    const { title, description, category, imageBase64 } = req.body;
     
-    console.log('Received data:', { title, description, category, file: req.file });
+    console.log('Received data:', { title, description, category, hasImage: !!imageBase64 });
     
     // Validate input
     const validation = validateProduct(title, description);
@@ -122,28 +122,21 @@ router.post('/', authenticateToken, upload.single('image'), (req, res) => {
       });
     }
 
-    // Handle image upload
-    let imagePath = '';
-    if (req.file) {
-      imagePath = `/uploads/products/${req.file.filename}`;
-      console.log('Image uploaded to:', imagePath);
-    }
-
     // Create new product
     const newProduct = {
       id: products.length > 0 ? Math.max(...products.map(p => p.id)) + 1 : 1,
       title: title.trim(),
       description: description.trim(),
       category: category || 'Electronics',
-      image: imagePath,
+      imageBase64: imageBase64 || null,
       userId: req.user.userId,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
     products.push(newProduct);
-
-    res.status(201).json({
+    
+    console.log('Product created successfully:', { id: newProduct.id, title: newProduct.title });    res.status(201).json({
       message: 'Product created successfully',
       product: newProduct
     });
@@ -154,12 +147,12 @@ router.post('/', authenticateToken, upload.single('image'), (req, res) => {
 });
 
 // Update product (protected route)
-router.put('/:id', authenticateToken, upload.single('image'), (req, res) => {
+router.put('/:id', authenticateToken, (req, res) => {
   try {
     const productId = parseInt(req.params.id);
-    const { title, description, category } = req.body;
+    const { title, description, category, imageBase64 } = req.body;
     
-    console.log('Updating product with data:', { title, description, category, file: req.file });
+    console.log('Updating product with data:', { title, description, category, hasImage: !!imageBase64 });
     
     if (isNaN(productId)) {
       return res.status(400).json({ message: 'Invalid product ID' });
@@ -181,27 +174,19 @@ router.put('/:id', authenticateToken, upload.single('image'), (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Handle image upload
-    let imagePath = products[productIndex].image; // Keep existing image by default
-    if (req.file) {
-      imagePath = `/uploads/products/${req.file.filename}`;
-      console.log('New image uploaded to:', imagePath);
-    }
-
     // Update product
     products[productIndex] = {
       ...products[productIndex],
       title: title.trim(),
       description: description.trim(),
       category: category || products[productIndex].category || 'Electronics',
-      image: imagePath,
+      imageBase64: imageBase64 !== undefined ? imageBase64 : products[productIndex].imageBase64,
       updatedAt: new Date().toISOString()
     };
 
     res.json({
       message: 'Product updated successfully',
-      product: products[productIndex]
-    });
+      product: products[productIndex]    });
   } catch (error) {
     console.error('Update product error:', error);
     res.status(500).json({ message: 'Server error while updating product' });

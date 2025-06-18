@@ -1,120 +1,508 @@
 import React, { useState, useEffect } from 'react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import LoginForm from './components/LoginForm';
-import RegisterForm from './components/RegisterForm';
-import ProductList from './components/ProductList';
-import ProtectedRoute from './components/ProtectedRoute';
+import axios from 'axios';
+import { Header, AuthForm, CategoryFilter, ProductForm, ProductList } from './components';
 
-const AuthWrapper = () => {
-  const { isAuthenticated, loading } = useAuth();
+const App = () => {
+  // Authentication state
   const [showLogin, setShowLogin] = useState(true);
-  const [backendStatus, setBackendStatus] = useState('checking');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // Test backend connection
-  useEffect(() => {
-    const testBackend = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/health');
-        if (response.ok) {
-          setBackendStatus('connected');
-        } else {
-          setBackendStatus('error');
-        }
-      } catch (error) {
-        setBackendStatus('disconnected');
+  // Login form state
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
+  
+  // Register form state
+  const [registerData, setRegisterData] = useState({ 
+    name: '', 
+    email: '', 
+    password: '', 
+    confirmPassword: '' 
+  });
+
+  // Products state
+  const [products, setProducts] = useState([]);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newProduct, setNewProduct] = useState({ 
+    title: '', 
+    description: '', 
+    imageBase64: null, 
+    imageFile: null, 
+    category: 'Electronics' 
+  });
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [editProduct, setEditProduct] = useState({ 
+    title: '', 
+    description: '', 
+    imageBase64: null, 
+    imageFile: null, 
+    category: 'Electronics' 
+  });
+  const [imagePreview, setImagePreview] = useState('');
+  const [editImagePreview, setEditImagePreview] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('All');
+
+  // Constants
+  const API_URL = 'http://localhost:5000/api';
+  const categories = ['Electronics', 'Fashion', 'Home & Garden', 'Sports & Fitness'];
+  const categoryColors = {
+    'Electronics': '#667eea',
+    'Fashion': '#667eea', 
+    'Home & Garden': '#667eea',
+    'Sports & Fitness': '#667eea'
+  };
+
+  // Convert file to base64
+  const convertToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = error => reject(error);
+    });
+  };
+
+  // Test image loading function
+  const testImageLoad = async (imagePath) => {
+    try {
+      const response = await fetch(`http://localhost:5000${imagePath}`);
+      if (response.ok) {
+        console.log('✅ Image accessible:', imagePath);
+        return true;
+      } else {
+        console.error('❌ Image not accessible:', imagePath, 'Status:', response.status);
+        return false;
       }
-    };
-    testBackend();
+    } catch (error) {
+      console.error('❌ Error testing image:', imagePath, error);
+      return false;
+    }
+  };
+
+  // Test backend connectivity
+  const testBackendConnection = async () => {
+    try {
+      console.log('Testing backend connection...');
+      const response = await axios.get(`${API_URL}/health`);
+      console.log('✅ Backend connection successful:', response.data);
+      
+      // Test if uploads directory is accessible
+      try {
+        const uploadsTest = await fetch('http://localhost:5000/uploads/products/');
+        console.log('📁 Uploads directory status:', uploadsTest.status);
+        if (uploadsTest.status === 403 || uploadsTest.status === 200) {
+          console.log('✅ Uploads directory is accessible');
+        }
+      } catch (uploadError) {
+        console.warn('⚠️ Could not test uploads directory:', uploadError.message);
+      }
+      
+    } catch (error) {
+      console.error('❌ Backend connection failed:', error);
+      setError('Cannot connect to server. Please check if backend is running.');
+    }
+  };
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      fetchProfile();
+    }
+    
+    // Test backend connectivity
+    testBackendConnection();
   }, []);
 
-  // Show loading while checking authentication
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="glass rounded-2xl p-8 text-center fade-in">
-          <div className="relative">
-            <div className="animate-spin h-12 w-12 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-6"></div>
-            <div className="absolute inset-0 h-12 w-12 border-4 border-purple-500 border-b-transparent rounded-full mx-auto animate-spin animation-delay-150"></div>
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2 text-shadow">Loading...</h2>
-          <p className="text-white text-opacity-80">
-            Backend: <span className="font-semibold">{backendStatus}</span>
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const fetchProfile = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/auth/profile`);
+      setUser(response.data.user);
+      setIsAuthenticated(true);
+      fetchProducts();
+    } catch (error) {
+      localStorage.removeItem('token');
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  };
 
-  // Show backend connection status
-  if (backendStatus === 'disconnected') {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4">
-        <div className="glass rounded-2xl p-8 text-center max-w-md w-full fade-in">
-          <div className="mb-6">
-            <div className="mx-auto w-16 h-16 bg-red-500 rounded-full flex items-center justify-center mb-4">
-              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2 text-shadow">Connection Error</h2>
-            <p className="text-white text-opacity-80 mb-4">
-              Cannot connect to backend server on http://localhost:5000
-            </p>
-            <p className="text-sm text-white text-opacity-60">
-              Please make sure the backend server is running.
-            </p>
-          </div>
-          <button 
-            onClick={() => window.location.reload()} 
-            className="btn-primary w-full"
-          >
-            Retry Connection
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const fetchProducts = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/products`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      console.log('Fetched products:', response.data.products);
+      // Debug: Log image paths
+      response.data.products.forEach(product => {
+        if (product.image || product.imageBase64) {
+          console.log(`Product "${product.title}" image path:`, product.image);
+          console.log(`Product "${product.title}" base64:`, product.imageBase64 ? 'Present' : 'None');
+          if (product.image) {
+            console.log(`Full image URL: http://localhost:5000${product.image}`);
+          }
+        }
+      });
+      setProducts(response.data.products);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    }
+  };
 
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    console.log('Attempting login with:', loginData);
+
+    try {
+      const response = await axios.post(`${API_URL}/auth/login`, loginData);
+      console.log('Login response:', response.data);
+      
+      const { token, user } = response.data;
+      
+      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      setUser(user);
+      setIsAuthenticated(true);
+      fetchProducts();
+    } catch (error) {
+      console.error('Login error:', error);
+      console.error('Error response:', error.response?.data);
+      setError(error.response?.data?.message || 'Login failed');
+    }
+    
+    setLoading(false);
+  };
+
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    console.log('Attempting registration with:', registerData);
+
+    if (registerData.password !== registerData.confirmPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const response = await axios.post(`${API_URL}/auth/register`, {
+        name: registerData.name,
+        email: registerData.email,
+        password: registerData.password
+      });
+      
+      console.log('Registration response:', response.data);
+      
+      const { token, user } = response.data;
+      
+      localStorage.setItem('token', token);
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      
+      setUser(user);
+      setIsAuthenticated(true);
+      fetchProducts();
+    } catch (error) {
+      console.error('Registration error:', error);
+      console.error('Error response:', error.response?.data);
+      setError(error.response?.data?.message || 'Registration failed');
+    }
+    
+    setLoading(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    delete axios.defaults.headers.common['Authorization'];
+    setIsAuthenticated(false);
+    setUser(null);
+    setProducts([]);
+  };
+
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    
+    console.log('Attempting to add product:', newProduct);
+    console.log('Current token:', localStorage.getItem('token'));
+    
+    // Basic validation
+    if (!newProduct.title.trim()) {
+      setError('Product title is required');
+      return;
+    }
+    
+    if (newProduct.title.trim().length < 3) {
+      setError('Product title must be at least 3 characters long');
+      return;
+    }
+    
+    if (!newProduct.description.trim()) {
+      setError('Product description is required');
+      return;
+    }
+    
+    if (newProduct.description.trim().length < 10) {
+      setError('Product description must be at least 10 characters long');
+      return;
+    }
+    
+    try {
+      // Convert image to base64 if present
+      let imageBase64 = null;
+      if (newProduct.imageFile) {
+        imageBase64 = await convertToBase64(newProduct.imageFile);
+      }
+
+      const productData = {
+        title: newProduct.title,
+        description: newProduct.description,
+        category: newProduct.category,
+        imageBase64: imageBase64
+      };
+
+      const response = await axios.post(`${API_URL}/products`, productData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+      });
+      
+      console.log('Add product response:', response.data);
+      setProducts([...products, response.data.product]);
+      setNewProduct({ title: '', description: '', imageBase64: null, imageFile: null, category: 'Electronics' });
+      setImagePreview('');
+      setShowAddForm(false);
+      setError(''); // Clear any previous errors
+    } catch (error) {
+      console.error('Error adding product:', error);
+      console.error('Error response:', error.response?.data);
+      setError(error.response?.data?.message || 'Failed to add product');
+    }
+  };
+
+  const handleUpdateProduct = async (e) => {
+    e.preventDefault();
+    
+    console.log('Attempting to update product:', editProduct);
+    
+    // Basic validation
+    if (!editProduct.title.trim()) {
+      setError('Product title is required');
+      return;
+    }
+    
+    if (editProduct.title.trim().length < 3) {
+      setError('Product title must be at least 3 characters long');
+      return;
+    }
+    
+    if (!editProduct.description.trim()) {
+      setError('Product description is required');
+      return;
+    }
+    
+    if (editProduct.description.trim().length < 10) {
+      setError('Product description must be at least 10 characters long');
+      return;
+    }
+    
+    try {
+      // Convert image to base64 if new image is selected
+      let imageBase64 = editingProduct.imageBase64; // Keep existing image
+      if (editProduct.imageFile) {
+        imageBase64 = await convertToBase64(editProduct.imageFile);
+      }
+
+      const productData = {
+        title: editProduct.title,
+        description: editProduct.description,
+        category: editProduct.category,
+        imageBase64: imageBase64
+      };
+
+      const response = await axios.put(`${API_URL}/products/${editingProduct.id}`, productData, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+      });
+      
+      console.log('Update product response:', response.data);
+      
+      // Update the product in the list
+      setProducts(products.map(p => 
+        p.id === editingProduct.id ? response.data.product : p
+      ));
+      
+      setEditingProduct(null);
+      setEditProduct({ title: '', description: '', imageBase64: null, imageFile: null, category: 'Electronics' });
+      setEditImagePreview('');
+      setError(''); // Clear any previous errors
+    } catch (error) {
+      console.error('Error updating product:', error);
+      console.error('Error response:', error.response?.data);
+      setError(error.response?.data?.message || 'Failed to update product');
+    }
+  };
+
+  const startEditProduct = (product) => {
+    setEditingProduct(product);
+    setEditProduct({ 
+      title: product.title, 
+      description: product.description, 
+      category: product.category || 'Electronics',
+      imageFile: null 
+    });
+    setEditImagePreview(product.imageBase64 || ''); // Show existing image if any
+    setShowAddForm(false); // Close add form if open
+  };
+
+  const cancelEdit = () => {
+    setEditingProduct(null);
+    setEditProduct({ title: '', description: '', imageBase64: null, imageFile: null, category: 'Electronics' });
+    setEditImagePreview('');
+  };
+
+  const handleDeleteProduct = async (id) => {
+    try {
+      await axios.delete(`${API_URL}/products/${id}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+      setProducts(products.filter(p => p.id !== id));
+    } catch (error) {
+      console.error('Error deleting product:', error);
+    }
+  };
+
+  // If authenticated, show products page
   if (isAuthenticated) {
     return (
-      <ProtectedRoute>
-        <ProductList />
-      </ProtectedRoute>
+      <div style={{ 
+        background: '#ffffff',
+        minHeight: '100vh'
+      }}>
+        <Header user={user} onLogout={handleLogout} />
+        
+        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '30px 20px' }}>
+          {/* Add Product Button */}
+          <div style={{ marginBottom: '30px' }}>
+            <button 
+              onClick={() => {
+                setShowAddForm(!showAddForm);
+                if (!showAddForm) {
+                  // Cancel any ongoing edit when starting to add
+                  setEditingProduct(null);
+                  setEditProduct({ title: '', description: '', category: 'Electronics' });
+                }
+              }}
+              style={{ 
+                padding: '14px 28px', 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', 
+                color: 'white',
+                border: 'none',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: '16px',
+                boxShadow: '0 4px 12px rgba(102, 126, 234, 0.3)',
+                transition: 'all 0.2s'
+              }}
+            >
+              {showAddForm ? '✕ Cancel' : '+ Add New Product'}
+            </button>
+          </div>
+
+          <CategoryFilter
+            categories={categories}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            products={products}
+            categoryColors={categoryColors}
+          />
+
+          {/* Error Display */}
+          {error && (
+            <div style={{ 
+              background: 'rgba(220, 38, 38, 0.2)', 
+              border: '1px solid rgba(220, 38, 38, 0.5)',
+              padding: '10px', 
+              borderRadius: '8px',
+              marginBottom: '20px',
+              color: '#fca5a5'
+            }}>
+              {error}
+            </div>
+          )}
+
+          {/* Add Product Form */}
+          {showAddForm && (
+            <ProductForm
+              isEditing={false}
+              product={newProduct}
+              setProduct={setNewProduct}
+              imagePreview={imagePreview}
+              setImagePreview={setImagePreview}
+              categories={categories}
+              onSubmit={handleAddProduct}
+              onCancel={() => setShowAddForm(false)}
+              convertToBase64={convertToBase64}
+            />
+          )}
+
+          {/* Edit Product Form */}
+          {editingProduct && (
+            <ProductForm
+              isEditing={true}
+              product={editProduct}
+              setProduct={setEditProduct}
+              editingProduct={editingProduct}
+              imagePreview={editImagePreview}
+              setImagePreview={setEditImagePreview}
+              categories={categories}
+              onSubmit={handleUpdateProduct}
+              onCancel={cancelEdit}
+              convertToBase64={convertToBase64}
+            />
+          )}
+
+          <ProductList
+            products={products}
+            selectedCategory={selectedCategory}
+            categoryColors={categoryColors}
+            onEditProduct={startEditProduct}
+            onDeleteProduct={handleDeleteProduct}
+            onShowAddForm={() => setShowAddForm(true)}
+          />
+        </div>
+      </div>
     );
   }
 
+  // Login/Register page
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      {backendStatus === 'connected' && (
-        <div className="fixed top-6 right-6 z-50 slide-up">
-          <div className="bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg flex items-center">
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Backend Connected
-          </div>
-        </div>
-      )}
-      
-      <div className="w-full max-w-md">
-        {showLogin ? (
-          <LoginForm onToggleForm={() => setShowLogin(false)} />
-        ) : (
-          <RegisterForm onToggleForm={() => setShowLogin(true)} />
-        )}
-      </div>
-    </div>
+    <AuthForm 
+      showLogin={showLogin}
+      setShowLogin={setShowLogin}
+      loginData={loginData}
+      setLoginData={setLoginData}
+      registerData={registerData}
+      setRegisterData={setRegisterData}
+      handleLogin={handleLogin}
+      handleRegister={handleRegister}
+      loading={loading}
+      error={error}
+    />
   );
 };
-
-function App() {
-  return (
-    <AuthProvider>
-      <div className="App min-h-screen">
-        <AuthWrapper />
-      </div>
-    </AuthProvider>
-  );
-}
 
 export default App;
