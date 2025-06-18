@@ -148,29 +148,4 @@ For testing purposes, you can use:
 - **Email**: admin@example.com
 - **Password**: password
 
-## 🤝 Contributing
 
-1. Fork the project
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- React team for the amazing library
-- Express.js community
-- Tailwind CSS for the utility-first CSS framework
-- All contributors who helped make this project better
-
-## 🐛 Issues
-
-If you encounter any issues, please file them in the [Issues](https://github.com/AashaniSamarakoon/Product_Managment/issues) section.
-
-## 📞 Support
-
-For support, email [support@productmanagement.com](mailto:support@productmanagement.com) or join our community discussions.
