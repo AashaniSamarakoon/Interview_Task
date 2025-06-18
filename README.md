@@ -38,8 +38,8 @@ A modern full-stack web application for managing products with user authenticati
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/AashaniSamarakoon/Product_Managment.git
-   cd Product_Managment
+   git clone https://github.com/AashaniSamarakoon/Interview_Task.git
+   cd Interview_Task
    ```
 
 2. **Install dependencies**
