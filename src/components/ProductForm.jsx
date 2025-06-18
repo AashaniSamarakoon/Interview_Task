@@ -2,7 +2,6 @@ import React from 'react';
 
 const ProductForm = ({ 
   isEditing,
-  showAddForm,
   categories,
   product,
   setProduct,
@@ -10,7 +9,7 @@ const ProductForm = ({
   setImagePreview,
   onSubmit,
   onCancel,
-  setProduct: setProductProp // Allow both setNewProduct and setEditProduct
+  editingProduct // For edit mode
 }) => {
   
   const handleImageChange = async (e) => {
@@ -30,10 +29,7 @@ const ProductForm = ({
     setProduct({...product, imageFile: null});
     setImagePreview('');
   };
-
-  if (!showAddForm && !isEditing) {
-    return null;
-  }
+  // Component is already conditionally rendered in App.jsx
 
   return (
     <div style={{ 
@@ -267,9 +263,7 @@ const ProductForm = ({
             }}>
               Drag & drop an image or click to browse
             </p>
-          </div>
-
-          {imagePreview && (
+          </div>          {(imagePreview || (isEditing && editingProduct?.imageBase64) || (isEditing && editingProduct?.image)) && (
             <div style={{ 
               textAlign: 'center',
               padding: '15px',
@@ -278,7 +272,7 @@ const ProductForm = ({
               border: '1px solid #e9ecef'
             }}>
               <img 
-                src={imagePreview} 
+                src={imagePreview || editingProduct?.imageBase64 || `http://localhost:5000${editingProduct?.image}`} 
                 alt="Preview" 
                 style={{ 
                   maxWidth: '200px', 
